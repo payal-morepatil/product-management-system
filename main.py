@@ -1,68 +1,72 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI , Depends, HTTPException
 from sqlalchemy.orm import Session
-
 import models
-
 from database import engine, get_db
+from schemas import ProductCreate , ProductResponse
 
-from schemas import ProductCreate, ProductResponse
+from schemas import LoginRequest
 
+from auth import authenticate_user, create_token, get_current_user
 
-# Create database tables
 models.Base.metadata.create_all(bind=engine)
 
+app = FastAPI()
 
-# Create FastAPI application
-app = FastAPI(title="Product Management System")
-
-
-# Welcome API
-@app.get("/")
+@app.get('/')
 def home():
-
     return {
-        "message": "Welcome to Product Management System",
-        "status": "API is running successfully"
+        'message':'welcome to product management system',
+        'status': 'API is running successfully'
     }
 
+@app.post("/login")
+def login(user_data: LoginRequest):
 
-# CREATE PRODUCT
-@app.post("/products", response_model=ProductResponse)
+    if not authenticate_user(
+        user_data.username,
+        user_data.password
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    token = create_token(user_data.username)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+@app.post("/products", response_model= ProductResponse)
 def create_product(
-    product: ProductCreate,
-    db: Session = Depends(get_db)
+        product: ProductCreate,
+        db : Session = Depends(get_db),
+        current_user: dict = Depends(get_current_user)
 ):
+        new_product = models.Product(
+              name= product.name,
+              description = product.description,
+              price = product.price,
+              quantity = product.quantity,
+              category = product.category
+        )
 
-    new_product = models.Product(
-        name=product.name,
-        description=product.description,
-        price=product.price,
-        quantity=product.quantity,
-        category=product.category
-    )
-
-    db.add(new_product)
-
-    db.commit()
-
-    db.refresh(new_product)
-
-    return new_product
+        db.add(new_product)
+        db.commit()
+        db.refresh(new_product)
+        return new_product
 
 
-# GET ALL PRODUCTS
-@app.get("/products", response_model=list[ProductResponse])
+@app.get('/products', response_model=list[ProductResponse])
 def get_products(
-    db: Session = Depends(get_db)
+            db: Session = Depends(get_db)
 ):
-
-    products = db.query(models.Product).all()
-
-    return products
+            products = db.query(models.Product).all()
+            return products
 
 
 
-# UPDATE PRODUCT
 @app.put("/products/{product_id}", response_model=ProductResponse)
 def update_product(
     product_id: int,
@@ -98,7 +102,6 @@ def update_product(
     return product
 
 
-# DELETE PRODUCT
 @app.delete("/products/{product_id}")
 def delete_product(
     product_id: int,
