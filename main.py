@@ -2,22 +2,14 @@ from fastapi import FastAPI , Depends, HTTPException
 from sqlalchemy.orm import Session
 import models
 from database import engine, get_db
-from schemas import ProductCreate , ProductResponse
+from schemas import ProductCreate , ProductResponse, LoginRequest, TokenResponse
+from auth import authenticate_user,create_token, get_current_user
 
-from schemas import LoginRequest
-
-from auth import authenticate_user, create_token, get_current_user
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-@app.get('/')
-def home():
-    return {
-        'message':'welcome to product management system',
-        'status': 'API is running successfully'
-    }
 
 @app.post("/login")
 def login(user_data: LoginRequest):
@@ -38,11 +30,19 @@ def login(user_data: LoginRequest):
         "token_type": "bearer"
     }
 
+@app.get('/')
+def home():
+    return {
+        'message':'welcome to product management system',
+        'status': 'API is running successfully'
+    }
+
+
 @app.post("/products", response_model= ProductResponse)
 def create_product(
         product: ProductCreate,
         db : Session = Depends(get_db),
-        current_user: dict = Depends(get_current_user)
+        current_user: str = Depends(get_current_user)
 ):
         new_product = models.Product(
               name= product.name,
@@ -60,18 +60,19 @@ def create_product(
 
 @app.get('/products', response_model=list[ProductResponse])
 def get_products(
-            db: Session = Depends(get_db)
+            db: Session = Depends(get_db),
+            current_user: str = Depends(get_current_user)
 ):
             products = db.query(models.Product).all()
             return products
-
 
 
 @app.put("/products/{product_id}", response_model=ProductResponse)
 def update_product(
     product_id: int,
     product_data: ProductCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
 
     product = db.query(models.Product).filter(
@@ -105,7 +106,8 @@ def update_product(
 @app.delete("/products/{product_id}")
 def delete_product(
     product_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
 
     product = db.query(models.Product).filter(

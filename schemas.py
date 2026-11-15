@@ -1,13 +1,12 @@
 from pydantic import BaseModel, Field, ConfigDict
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
-
+    username : str
+    password :str
 
 class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
+    access_token : str
+    token_type : str
 
 
 # create product 
